@@ -39,7 +39,7 @@ main:
 			LDHX #initial_message
 			JSR write_message
 			
-ha:			MOV #200D,var_delay
+Bucle_Blink:			MOV #200D,var_delay
 			JSR delayAx5ms ; delay for 20ms (level voltage desired to LCD)		
 			LDA #08H
 			JSR send_command
@@ -47,7 +47,7 @@ ha:			MOV #200D,var_delay
 			JSR delayAx5ms ; delay for 20ms (level voltage desired to LCD)		
 			LDA #0CH
 			JSR send_command    
-			JMP ha
+			JMP Bucle_Blink
 			
 ;******************************************Subroutine for set the initial configuration of the MCU            
 initialconfig:
