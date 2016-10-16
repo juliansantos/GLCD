@@ -1,8 +1,7 @@
 ;*******************************************************************
 ;*                       LCD FIRMWARE 							   *
 ;*******************************************************************
-  
-            INCLUDE 'MC9S08JM16.inc'
+            INCLUDE 'MC9S08JM16.inc'   
 ; Based on CPU DB MC9S08JM16_48, version 3.00.048 (RegistersPrg V2.32)
 
 ; ###################################################################
@@ -3242,7 +3241,6 @@ mPageErase:         equ     $40
         ENDIF
 
 ; EOF
-         
   ;*******************************Pin definition section
 pin_ENABLE EQU 5 ; pin ENABLE
 pin_RS EQU 4 ; pin RS
@@ -3256,6 +3254,7 @@ cmd_line2 EQU 90H ; Command to set the cursor in the line 2
 cmd_line4 EQU 98H 
 cmd_displayON EQU 0CH ; Command to turn on the display
 cmd_displayOFF EQU 80H
+cmd_home EQU 2H
 
   ;*****************************Flags definition
 display_P EQU 0  
@@ -3282,8 +3281,8 @@ main:
 			JSR init_LCD
 			LDHX #initial_message
 			JSR write_message
-			JSR init_TPM1
 			JSR init_KBI
+			JSR init_TPM1
 			JMP *
 			
 ;******************************************Subroutine for set the initial configuration of the MCU            
@@ -3316,8 +3315,14 @@ fin_initLCD:	RTS
 
 ;******************************************Subroutine to initialize keyboard interrupt
 init_KBI:
-
+		   LDA #%00001111
+		   STA PTGPE ; Enabling pull-up G 0-1-2-3
+		   MOV #%11000011,KBIES  ; Keyboard Edge Select Bit 0 (Pull down)
+		   MOV #%11000011,KBIPE ;  Keyboard pin enable
+		   MOV #%00000100,KBISC ; Clearing flag and setting mod for edge
+		   BSET KBISC_KBIE,KBISC  ; Enabling interrupt for keyboard
 		   RTS		
+		   
 ;******************************************Subroutine to  initialize timer interrupt
 init_TPM1:
 		MOV #%01000111,TPM1SC ; Timer Off, Enable interrupt, PS{1:128}
@@ -3327,8 +3332,7 @@ init_TPM1:
 		CLI
 		RTS		   
 		   	
-;******************************************Subroutine for send data to LCD
-
+;******************************************Subroutines neccesaries to send data to LCD
 enable_pulse: BSET pin_ENABLE,PTFD 
  			MOV #4,var_delay
 			JSR delayAx5ms
@@ -3377,6 +3381,17 @@ delay_1:    AIX #-1 ; 2 cycles
 			
 ;********************************************ISR KEY_BOARD
 ISR_KEYBOARD:
+
+			MOV #20D,var_delay
+			JSR delayAx5ms ;For debouncing
+			BSET KBISC_KBACK,KBISC
+			LDA cmd_clear
+			JSR send_command
+			LDA cmd_home
+			JSR send_command
+			LDHX #msg1
+			JSR write_message
+		    ;BCLR KBISC_KBIE,KBISC 
 	;JMP *
 	RTI ; Return from interrupt			
 ;********************************************ISR TIMER 
@@ -3390,7 +3405,8 @@ ISR_TIMER:	BCLR TPM1SC_TOF,TPM1SC ; Clearing FlaG
 			JSR send_command
 			LDA #7
 			JSR send_data
-			LDA counter				 
+			LDA counter	
+			MOV #%11110000,PTED ; neccesary for keyboard			 
 			RTI
 discharge:		BSET display_P,flags
 			DEC counter
@@ -3400,15 +3416,17 @@ discharge:		BSET display_P,flags
 			ADD #cmd_line3	
 			JSR send_command	
 			LDA #' '
-			JSR send_data	
+			JSR send_data
+			MOV #%11110000,PTED ; neccesary for keyboard		
 			RTI			
 charging:
 			MOV #0,counter
 			BCLR display_P,flags
 			BRA ISR_TIMER			
+			
 ;********************************************Table to be displayed in the LCD
 
-config_LCD:	DC.B cmd_8bitmode,cmd_displayON,cmd_clear,cmd_line2,0H  ; 90 second line
+config_LCD:	DC.B cmd_8bitmode,cmd_displayON,cmd_clear,cmd_line2,0  ; 90 second line
 initial_message: DC.B '  BIENVENIDO ',2,0
 msg1: DC.B '  Gracias ',0
 
